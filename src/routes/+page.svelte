@@ -15,6 +15,8 @@
 	let feedbackMessage = $state('');
 	let images = $state<ImageRecord[]>([]);
 	let loadingImages = $state(false);
+	let isDragging = $state(false);
+	let dragCounter = 0;
 
 	async function loadImages() {
 		if (!user.did) return;
@@ -40,10 +42,11 @@
 		}
 	});
 
-	async function handleImageUpload(event: Event) {
-		const input = event.target as HTMLInputElement;
-		const file = input.files?.[0];
-		if (!file) return;
+	async function uploadImage(file: File) {
+		if (!file.type.startsWith('image/')) {
+			feedbackMessage = 'Please drop an image file';
+			return;
+		}
 
 		isUploading = true;
 		feedbackMessage = '';
@@ -90,6 +93,46 @@
 				fileInput.value = '';
 			}
 		}
+	}
+
+	function handleFileInput(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (file) uploadImage(file);
+	}
+
+	function handleDragEnter(event: DragEvent) {
+		event.preventDefault();
+		dragCounter++;
+		if (event.dataTransfer?.types.includes('Files')) {
+			isDragging = true;
+		}
+	}
+
+	function handleDragLeave(event: DragEvent) {
+		event.preventDefault();
+		dragCounter--;
+		if (dragCounter === 0) {
+			isDragging = false;
+		}
+	}
+
+	function handleDragOver(event: DragEvent) {
+		event.preventDefault();
+	}
+
+	function handleDrop(event: DragEvent) {
+		event.preventDefault();
+		dragCounter = 0;
+		isDragging = false;
+
+		if (!user.isLoggedIn) {
+			feedbackMessage = 'Please log in to upload images';
+			return;
+		}
+
+		const file = event.dataTransfer?.files[0];
+		if (file) uploadImage(file);
 	}
 
 	function getImageUrl(record: ImageRecord): string | undefined {
@@ -144,7 +187,27 @@
 	}
 </script>
 
-<div class="mx-auto my-4 max-w-3xl px-4 md:my-32">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+	class="min-h-screen"
+	ondragenter={handleDragEnter}
+	ondragleave={handleDragLeave}
+	ondragover={handleDragOver}
+	ondrop={handleDrop}
+>
+	<!-- Drag overlay -->
+	{#if isDragging && user.isLoggedIn}
+		<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+			<div class="flex flex-col items-center gap-4 text-white">
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+				</svg>
+				<span class="text-2xl font-medium">Drop image here to upload</span>
+			</div>
+		</div>
+	{/if}
+
+	<div class="mx-auto my-4 max-w-3xl px-4 md:my-32">
 	<h1 class="text-3xl font-bold">atproto image sharing</h1>
 
 	<a
@@ -177,7 +240,7 @@
 			accept="image/*"
 			class="hidden"
 			bind:this={fileInput}
-			onchange={handleImageUpload}
+			onchange={handleFileInput}
 		/>
 
 		<Button class="mt-8" disabled={isUploading} onclick={() => fileInput?.click()}>
@@ -204,7 +267,7 @@
 								alt=""
 								class="h-full w-full object-cover transition-transform group-hover:scale-105"
 							/>
-							<div class="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+							<div class="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 pointer-coarse:opacity-100">
 								<button
 									type="button"
 									class="rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
@@ -234,4 +297,5 @@
 			<div class="mt-8 text-sm text-base-500">No images uploaded yet</div>
 		{/if}
 	{/if}
+	</div>
 </div>
