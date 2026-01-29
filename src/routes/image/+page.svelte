@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 	import { parseUri, getRecord, getDetailedProfile, getBlobURL, getCDNImageBlobUrl } from '$lib/atproto';
 	import type { Did } from '@atcute/lexicons';
 
@@ -32,7 +33,7 @@
 
 	function getShareLink(): string {
 		const uri = page.url.searchParams.get('uri');
-		return `${window.location.origin}/image?uri=${encodeURIComponent(uri || '')}`;
+		return `${window.location.origin}${resolve('/image')}?uri=${encodeURIComponent(uri || '')}`;
 	}
 
 	async function copyLink() {

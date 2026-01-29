@@ -4,6 +4,7 @@
 	import Avatar from '$lib/atproto/UI/Avatar.svelte';
 	import Button from '$lib/atproto/UI/Button.svelte';
 	import { loginModalState } from '$lib/atproto/UI/LoginModal.svelte';
+	import { resolve } from '$app/paths';
 	type ImageRecord = {
 		uri: string;
 		value: Record<string, unknown>;
@@ -97,7 +98,7 @@
 	}
 
 	function getShareLink(uri: string): string {
-		return `${window.location.origin}/image?uri=${encodeURIComponent(uri)}`;
+		return `${window.location.origin}${resolve('/image')}?uri=${encodeURIComponent(uri)}`;
 	}
 
 	async function copyLink(event: Event, uri: string) {
@@ -167,7 +168,7 @@
 					{@const imageUrl = getImageUrl(image)}
 					{#if imageUrl}
 						<a
-							href="/image?uri={encodeURIComponent(image.uri)}"
+							href="{resolve('/image')}?uri={encodeURIComponent(image.uri)}"
 							class="group relative aspect-square overflow-hidden rounded-xl bg-base-200 dark:bg-base-800"
 						>
 							<img
