@@ -1,6 +1,6 @@
 import { dev } from '$app/environment';
 
-export const SITE = 'https://flo-bit.dev';
+export const SITE = 'https://at.pics';
 
 type Permissions = {
 	collections: readonly string[];
@@ -13,7 +13,7 @@ export const permissions = {
 
 	// example: only allow create and delete
 	// collections: ['xyz.statusphere.status?action=create&action=update'],
-	collections: ['dev.flo-bit.image'],
+	collections: ['pics.atmo.image'],
 
 	// what types of authenticated proxied requests you can make to services
 
