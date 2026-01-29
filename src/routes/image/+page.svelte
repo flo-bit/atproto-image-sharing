@@ -95,9 +95,14 @@
 			getDetailedProfile({ did })
 		])
 			.then(async ([record, profile]) => {
+				if (!record?.value) {
+					error = 'Image not found';
+					return;
+				}
+
 				const blob = record.value.image as { $type: 'blob'; ref: { $link: string } } | undefined;
 				if (!blob || blob.$type !== 'blob') {
-					error = 'No image found in record';
+					error = 'Image not found';
 					return;
 				}
 
@@ -116,7 +121,12 @@
 				} : undefined;
 			})
 			.catch((e: Error) => {
-				error = e?.message || 'Failed to fetch record';
+				const msg = e?.message?.toLowerCase() || '';
+				if (msg.includes('not found') || msg.includes('could not find') || msg.includes('record')) {
+					error = 'Image not found';
+				} else {
+					error = e?.message || 'Failed to load image';
+				}
 			})
 			.finally(() => {
 				loading = false;

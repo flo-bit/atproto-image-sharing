@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { user, logout, putRecord, createTID, uploadBlob, listRecords } from '$lib/atproto';
+	import { user, logout, putRecord, createTID, uploadBlob, listRecords, deleteRecord, parseUri } from '$lib/atproto';
 	import { compressImage, getImageFromRecord } from '$lib/atproto/image-helper';
 	import Avatar from '$lib/atproto/UI/Avatar.svelte';
 	import Button from '$lib/atproto/UI/Button.svelte';
@@ -114,6 +114,34 @@
 			feedbackMessage = 'Failed to copy link';
 		}
 	}
+
+	async function deleteImage(event: Event, uri: string) {
+		event.stopPropagation();
+		event.preventDefault();
+
+		if (!confirm('Delete this image?')) return;
+
+		const parsed = parseUri(uri);
+		if (!parsed?.rkey) {
+			feedbackMessage = 'Failed to delete image';
+			return;
+		}
+
+		try {
+			await deleteRecord({
+				collection: 'dev.flo-bit.image',
+				rkey: parsed.rkey
+			});
+			images = images.filter((img) => img.uri !== uri);
+			feedbackMessage = 'Image deleted';
+			setTimeout(() => {
+				if (feedbackMessage === 'Image deleted') feedbackMessage = '';
+			}, 2000);
+		} catch (error) {
+			console.error('Failed to delete image:', error);
+			feedbackMessage = 'Failed to delete image';
+		}
+	}
 </script>
 
 <div class="mx-auto my-4 max-w-3xl px-4 md:my-32">
@@ -156,7 +184,7 @@
 			{isUploading ? 'Uploading...' : 'Upload image'}
 		</Button>
 
-		<div class="mt-4 h-5 text-sm" class:text-green-600={feedbackMessage.includes('copied') || feedbackMessage.includes('uploaded')} class:text-red-600={feedbackMessage.includes('failed')}>
+		<div class="mt-4 h-5 text-sm" class:text-green-600={feedbackMessage.includes('copied') || feedbackMessage.includes('uploaded') || feedbackMessage.includes('deleted')} class:text-red-600={feedbackMessage.includes('Failed')}>
 			{feedbackMessage}
 		</div>
 
@@ -176,16 +204,28 @@
 								alt=""
 								class="h-full w-full object-cover transition-transform group-hover:scale-105"
 							/>
-							<button
-								type="button"
-								class="absolute right-2 top-2 rounded-full bg-black/50 p-2 text-white opacity-0 transition-opacity hover:bg-black/70 group-hover:opacity-100"
-								onclick={(e) => copyLink(e, image.uri)}
-								title="Copy link"
-							>
-								<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-								</svg>
-							</button>
+							<div class="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+								<button
+									type="button"
+									class="rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
+									onclick={(e) => copyLink(e, image.uri)}
+									title="Copy link"
+								>
+									<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+									</svg>
+								</button>
+								<button
+									type="button"
+									class="rounded-full bg-black/50 p-2 text-white hover:bg-red-600"
+									onclick={(e) => deleteImage(e, image.uri)}
+									title="Delete image"
+								>
+									<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+									</svg>
+								</button>
+							</div>
 						</a>
 					{/if}
 				{/each}
