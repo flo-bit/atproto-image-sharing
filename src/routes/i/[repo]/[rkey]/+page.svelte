@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import { getBlobURL, getCDNImageBlobUrl } from '$lib/atproto';
 	import { getShareLink } from '$lib';
+	import { resolve } from '$app/paths';
 
 	let imageUrl = $state<string | undefined>(undefined);
 	let fullQualityUrl = $state<string | undefined>(undefined);
@@ -72,7 +73,10 @@
 <svelte:head>
 	<meta
 		property="og:image"
-		content={getCDNImageBlobUrl({ did: data.did, blob: data.blob, size: 'thumbnail' })}
+		content={resolve("/i/[repo]/[rkey]", {
+			repo: page.params.repo ?? '',
+			rkey: page.params.rkey ?? ''
+		})}
 	/>
 	<meta
 		name="twitter:image"

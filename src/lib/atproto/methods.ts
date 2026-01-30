@@ -352,7 +352,8 @@ export async function getBlobURL({
 export function getCDNImageBlobUrl({
 	did,
 	blob,
-	size = 'thumbnail'
+	size = 'thumbnail',
+	type = 'webp'
 }: {
 	did?: string;
 	blob: {
@@ -362,11 +363,12 @@ export function getCDNImageBlobUrl({
 		};
 	};
 	size?: 'thumbnail' | 'fullsize';
+	type?: 'webp' | 'jpeg';
 }) {
 	did ??= user.did;
 	const sizeParam = size === 'fullsize' ? 'feed_fullsize' : 'feed_thumbnail';
 
-	return `https://cdn.bsky.app/img/${sizeParam}/plain/${did}/${blob.ref.$link}@webp`;
+	return `https://cdn.bsky.app/img/${sizeParam}/plain/${did}/${blob.ref.$link}@${type}`;
 }
 
 /**

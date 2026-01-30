@@ -46,6 +46,7 @@
 	},
 	"license": "MIT",
 	"dependencies": {
+		"@ethercorps/sveltekit-og": "^4.2.1",
 		"@sveltejs/adapter-cloudflare": "^7.2.6",
 		"wrangler": "^4.61.1"
 	}
