@@ -1,6 +1,6 @@
 import { dev } from '$app/environment';
 
-export const SITE = 'https://at.pics';
+export const SITE = 'https://atmo.pics';
 
 type Permissions = {
 	collections: readonly string[];
