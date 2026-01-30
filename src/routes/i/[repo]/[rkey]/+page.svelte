@@ -73,14 +73,17 @@
 <svelte:head>
 	<meta
 		property="og:image"
-		content={resolve('/i/[repo]/[rkey]', {
+		content={resolve('/i/[repo]/[rkey]/og.png', {
 			repo: page.params.repo ?? '',
 			rkey: page.params.rkey ?? ''
 		})}
 	/>
 	<meta
 		name="twitter:image"
-		content={getCDNImageBlobUrl({ did: data.did, blob: data.blob, size: 'thumbnail' })}
+		content={resolve('/i/[repo]/[rkey]/og.png', {
+			repo: page.params.repo ?? '',
+			rkey: page.params.rkey ?? ''
+		})}
 	/>
 	<meta name="twitter:card" content="summary_large_image" />
 
