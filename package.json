@@ -46,6 +46,7 @@
 	},
 	"license": "MIT",
 	"dependencies": {
-		"@sveltejs/adapter-cloudflare": "^7.2.6"
+		"@sveltejs/adapter-cloudflare": "^7.2.6",
+		"wrangler": "^4.61.1"
 	}
 }
