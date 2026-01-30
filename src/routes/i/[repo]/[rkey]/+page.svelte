@@ -1,13 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { getBlobURL, getCDNImageBlobUrl } from '$lib/atproto';
+	import { getBlobURL, getCDNImageBlobUrl, getDetailedProfile } from '$lib/atproto';
 	import { getShareLink } from '$lib';
 	import { resolve } from '$app/paths';
 
-	let imageUrl = $state<string | undefined>(undefined);
 	let fullQualityUrl = $state<string | undefined>(undefined);
-	let loading = $state(true);
-	let error = $state<string | undefined>(undefined);
 	let createdAt = $state<string | undefined>(undefined);
 	let uploader = $state<{ displayName?: string; handle?: string; avatar?: string } | undefined>(
 		undefined
@@ -21,7 +18,7 @@
 		clearTimeout(hideTimeout);
 		hideTimeout = setTimeout(() => {
 			showOverlay = false;
-		}, 3000);
+		}, 1500);
 	}
 
 	// Preload full quality image and swap when ready
@@ -45,6 +42,20 @@
 		}
 	}
 
+	async function downloadImage() {
+		const url = fullQualityUrl || (await getBlobURL({ did: data.did, blob: data.blob }));
+		const response = await fetch(url);
+		const blob = await response.blob();
+		const blobUrl = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = blobUrl;
+		a.download = `image-${page.params.rkey}`;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(blobUrl);
+	}
+
 	function formatDate(isoString: string): string {
 		const date = new Date(isoString);
 		return date.toLocaleDateString(undefined, {
@@ -57,14 +68,26 @@
 	}
 
 	$effect(() => {
-		loading = true;
-		error = undefined;
-		imageUrl = undefined;
 		fullQualityUrl = undefined;
 		createdAt = undefined;
 		uploader = undefined;
 
 		getBlobURL({ did: data.did, blob: data.blob }).then((url) => preloadFullQuality(url));
+	});
+
+	$effect(() => {
+		getDetailedProfile({ did: data.did }).then((profile) => {
+			if (profile) {
+				uploader = {
+					displayName: profile.displayName,
+					handle: profile.handle,
+					avatar: profile.avatar
+				};
+			}
+		});
+		if (data.record?.value?.createdAt) {
+			createdAt = data.record.value.createdAt as string;
+		}
 	});
 
 	let { data } = $props();
@@ -112,7 +135,7 @@
 		class:opacity-0={!showOverlay}
 		class:pointer-events-none={!showOverlay}
 	>
-		<div class="flex items-end justify-between gap-4">
+		<div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
 			<!-- Uploader info -->
 			<div class="flex items-center gap-3">
 				{#if uploader?.avatar}
@@ -123,33 +146,63 @@
 						<div class="font-medium">{uploader.displayName || uploader.handle}</div>
 					{/if}
 					{#if createdAt}
-						<div class="text-sm text-white/70">{formatDate(createdAt)}</div>
+						<div class="hidden text-sm text-white/70 sm:block">{formatDate(createdAt)}</div>
 					{/if}
 				</div>
 			</div>
 
-			<!-- Copy link button -->
-			<button
-				type="button"
-				class="flex items-center gap-2 rounded-full bg-white/20 px-4 py-2 text-sm text-white backdrop-blur-sm transition-colors hover:bg-white/30"
-				onclick={copyLink}
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="h-4 w-4"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke="currentColor"
-					stroke-width="2"
+			<!-- Action buttons -->
+			<div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+				<!-- Copy link button -->
+				<button
+					type="button"
+					class="flex cursor-pointer items-center justify-center gap-2 rounded-full bg-white/20 px-4 py-2 text-sm text-white backdrop-blur-sm transition-colors hover:bg-white/30"
+					onclick={copyLink}
 				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-					/>
-				</svg>
-				{copied ? 'Copied!' : 'Copy link'}
-			</button>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-4 w-4"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+						/>
+					</svg>
+					{copied ? 'Copied!' : 'Copy link'}
+				</button>
+
+				<!-- Download button -->
+				<button
+					type="button"
+					class="flex cursor-pointer items-center justify-center gap-2 rounded-full bg-white/20 px-4 py-2 text-sm text-white backdrop-blur-sm transition-colors hover:bg-white/30"
+					onclick={downloadImage}
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-4 w-4"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+						/>
+					</svg>
+					Download
+				</button>
+			</div>
+
+			{#if createdAt}
+				<div class="text-sm text-white/70 sm:hidden">{formatDate(createdAt)}</div>
+			{/if}
 		</div>
 	</div>
 </div>
