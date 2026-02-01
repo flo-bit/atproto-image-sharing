@@ -145,6 +145,26 @@
 		if (file) uploadImage(file);
 	}
 
+	function handlePaste(event: ClipboardEvent) {
+		const items = event.clipboardData?.items;
+		if (!items) return;
+
+		for (const item of items) {
+			if (item.type.startsWith('image/')) {
+				const file = item.getAsFile();
+				if (!file) return;
+
+				if (!user.isLoggedIn) {
+					feedbackMessage = 'Please log in to upload images';
+					return;
+				}
+
+				uploadImage(file);
+				return;
+			}
+		}
+	}
+
 	function getImageUrl(record: ImageRecord): string | undefined {
 		if (!user.did) return;
 		return getImageFromRecord(record.value, user.did);
@@ -193,6 +213,8 @@
 	}
 </script>
 
+<svelte:window onpaste={handlePaste} />
+
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	class="min-h-screen"
@@ -201,6 +223,29 @@
 	ondragover={handleDragOver}
 	ondrop={handleDrop}
 >
+	<!-- Upload overlay -->
+	{#if isUploading}
+		<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+			<div class="flex flex-col items-center gap-4 text-white">
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-16 w-16 animate-pulse"
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke="currentColor"
+					stroke-width="1.5"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+					/>
+				</svg>
+				<span class="text-2xl font-medium">Uploading...</span>
+			</div>
+		</div>
+	{/if}
+
 	<!-- Drag overlay -->
 	{#if isDragging && user.isLoggedIn}
 		<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
