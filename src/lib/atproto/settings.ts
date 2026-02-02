@@ -27,7 +27,7 @@ export const permissions = {
 	// blobs: ['video/*', 'text/html']
 	// example: allowing all blob types
 	// blobs: ['*/*']
-	blobs: ['image/*', 'video/*']
+	blobs: ['*/*']
 } as const satisfies Permissions;
 
 // Extract base collection name (before any query params)
