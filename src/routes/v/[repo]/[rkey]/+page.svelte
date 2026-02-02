@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { getCDNImageBlobUrl, getDetailedProfile } from '$lib/atproto';
-	import { getShareLink } from '$lib';
+	import { getDetailedProfile } from '$lib/atproto';
+	import { getVideoShareLink } from '$lib';
 	import { resolve } from '$app/paths';
 
-	let fullQualityLoaded = $state(false);
+	let loading = $state(true);
+	let paused = $state(false);
+	let videoEl = $state<HTMLVideoElement | undefined>(undefined);
 	let createdAt = $state<string | undefined>(undefined);
 	let uploader = $state<{ displayName?: string; handle?: string; avatar?: string } | undefined>(
 		undefined
@@ -21,20 +23,20 @@
 		}, 1500);
 	}
 
-	// Preload full quality image and swap when ready
-	function preloadFullQuality(url: string) {
-		const img = new Image();
-		img.onload = () => {
-			fullQualityLoaded = true;
-		};
-		img.src = url;
+	function togglePlayback() {
+		if (!videoEl) return;
+		if (videoEl.paused) {
+			videoEl.play();
+		} else {
+			videoEl.pause();
+		}
 	}
 
 	async function copyLink() {
 		try {
 			if (!page.params.repo || !page.params.rkey) return;
 
-			await navigator.clipboard.writeText(getShareLink(page.params.repo, page.params.rkey));
+			await navigator.clipboard.writeText(getVideoShareLink(page.params.repo, page.params.rkey));
 			copied = true;
 			setTimeout(() => (copied = false), 2000);
 		} catch {
@@ -42,13 +44,13 @@
 		}
 	}
 
-	async function downloadImage() {
-		const response = await fetch(data.imageUrl);
+	async function downloadVideo() {
+		const response = await fetch(data.videoUrl);
 		const blob = await response.blob();
 		const blobUrl = URL.createObjectURL(blob);
 		const a = document.createElement('a');
 		a.href = blobUrl;
-		a.download = `image-${page.params.rkey}`;
+		a.download = `video-${page.params.rkey}`;
 		document.body.appendChild(a);
 		a.click();
 		document.body.removeChild(a);
@@ -65,11 +67,6 @@
 			minute: '2-digit'
 		});
 	}
-
-	$effect(() => {
-		fullQualityLoaded = false;
-		preloadFullQuality(data.imageUrl);
-	});
 
 	$effect(() => {
 		getDetailedProfile({ did: data.did }).then((profile) => {
@@ -92,39 +89,92 @@
 <svelte:head>
 	<meta
 		property="og:image"
-		content={resolve('/i/[repo]/[rkey]/og.png', {
+		content={resolve('/v/[repo]/[rkey]/og.png', {
 			repo: page.params.repo ?? '',
 			rkey: page.params.rkey ?? ''
 		})}
 	/>
 	<meta
 		name="twitter:image"
-		content={resolve('/i/[repo]/[rkey]/og.png', {
+		content={resolve('/v/[repo]/[rkey]/og.png', {
 			repo: page.params.repo ?? '',
 			rkey: page.params.rkey ?? ''
 		})}
 	/>
 	<meta name="twitter:card" content="summary_large_image" />
 
-	<title>shared image</title>
-	<meta property="og:title" content="shared image" />
-	<meta name="twitter:title" content="shared image" />
+	<title>shared video</title>
+	<meta property="og:title" content="shared video" />
+	<meta name="twitter:title" content="shared video" />
 </svelte:head>
 
 <div
 	class="fixed inset-0 flex items-center justify-center bg-black"
 	role="presentation"
 	onpointermove={showOverlayTemporarily}
-	onclick={showOverlayTemporarily}
 	onkeydown={showOverlayTemporarily}
 >
-	<img
-		src={fullQualityLoaded
-			? data.imageUrl
-			: getCDNImageBlobUrl({ did: data.did, blob: data.blob, size: 'thumbnail' })}
-		alt=""
+	<!-- svelte-ignore a11y_media_has_caption -->
+	<video
+		bind:this={videoEl}
+		bind:paused
+		autoplay
+		loop
+		muted
+		playsinline
 		class="h-full w-full object-contain"
-	/>
+		src={data.videoUrl}
+		onclick={togglePlayback}
+		oncanplay={() => (loading = false)}
+	></video>
+
+	{#if loading}
+		<div class="absolute inset-0 z-10 flex items-center justify-center bg-black">
+			<div class="flex flex-col items-center gap-4">
+				<svg
+					class="h-10 w-10 animate-spin text-white"
+					xmlns="http://www.w3.org/2000/svg"
+					fill="none"
+					viewBox="0 0 24 24"
+				>
+					<circle
+						class="opacity-25"
+						cx="12"
+						cy="12"
+						r="10"
+						stroke="currentColor"
+						stroke-width="4"
+					></circle>
+					<path
+						class="opacity-75"
+						fill="currentColor"
+						d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+					></path>
+				</svg>
+				<p class="text-sm text-white">Loading video...</p>
+			</div>
+		</div>
+	{/if}
+
+	{#if paused}
+		<button
+			type="button"
+			class="absolute inset-0 flex items-center justify-center"
+			aria-label="Play video"
+			onclick={togglePlayback}
+		>
+			<div class="rounded-full bg-black/50 p-4">
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-12 w-12 text-white"
+					viewBox="0 0 24 24"
+					fill="currentColor"
+				>
+					<path d="M8 5v14l11-7z" />
+				</svg>
+			</div>
+		</button>
+	{/if}
 
 	<!-- Info overlay -->
 	<div
@@ -177,7 +227,7 @@
 				<button
 					type="button"
 					class="flex cursor-pointer items-center justify-center gap-2 rounded-full bg-white/20 px-4 py-2 text-sm text-white backdrop-blur-sm transition-colors hover:bg-white/30"
-					onclick={downloadImage}
+					onclick={downloadVideo}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"

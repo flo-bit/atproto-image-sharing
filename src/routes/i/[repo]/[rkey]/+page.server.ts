@@ -1,4 +1,4 @@
-import { getRecord, resolveHandle } from '$lib/atproto';
+import { getBlobURL, getRecord, resolveHandle } from '$lib/atproto';
 import { isDid, isHandle } from '@atcute/lexicons/syntax';
 import { error } from '@sveltejs/kit';
 
@@ -20,5 +20,8 @@ export async function load({ params }) {
 	if (!blob || blob.$type !== 'blob') {
 		throw error(404, 'Image not found');
 	}
-	return { record, did, blob };
+
+	const imageUrl = await getBlobURL({ did, blob });
+
+	return { record, did, blob, imageUrl };
 }

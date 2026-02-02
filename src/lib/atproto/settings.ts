@@ -13,7 +13,7 @@ export const permissions = {
 
 	// example: only allow create and delete
 	// collections: ['xyz.statusphere.status?action=create&action=update'],
-	collections: ['pics.atmo.image'],
+	collections: ['pics.atmo.image', 'pics.atmo.video'],
 
 	// what types of authenticated proxied requests you can make to services
 
@@ -27,7 +27,7 @@ export const permissions = {
 	// blobs: ['video/*', 'text/html']
 	// example: allowing all blob types
 	// blobs: ['*/*']
-	blobs: ['image/*']
+	blobs: ['image/*', 'video/*']
 } as const satisfies Permissions;
 
 // Extract base collection name (before any query params)

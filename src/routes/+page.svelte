@@ -10,35 +10,53 @@
 		parseUri
 	} from '$lib/atproto';
 	import { compressImage, getImageFromRecord } from '$lib/atproto/image-helper';
+	import { generateVideoThumbnail } from '$lib/atproto/video-helper';
 	import Avatar from '$lib/atproto/UI/Avatar.svelte';
 	import Button from '$lib/atproto/UI/Button.svelte';
 	import { loginModalState } from '$lib/atproto/UI/LoginModal.svelte';
 	import { resolve } from '$app/paths';
-	import { getShareLink, getShareLinkFromUri } from '$lib';
-	type ImageRecord = {
+	import { getShareLinkFromUri } from '$lib';
+
+	type MediaRecord = {
 		uri: string;
 		value: Record<string, unknown>;
+		type: 'image' | 'video';
 	};
 
 	let fileInput: HTMLInputElement | undefined = $state();
 	let isUploading = $state(false);
+	let uploadingMessage = $state('');
 	let feedbackMessage = $state('');
-	let images = $state<ImageRecord[]>([]);
+	let items = $state<MediaRecord[]>([]);
 	let loadingImages = $state(false);
 	let isDragging = $state(false);
 	let dragCounter = 0;
 
-	async function loadImages() {
+	async function loadItems() {
 		if (!user.did) return;
 		loadingImages = true;
 		try {
-			const records = await listRecords({
-				collection: 'pics.atmo.image',
-				limit: 0
+			const [imageRecords, videoRecords] = await Promise.all([
+				listRecords({ collection: 'pics.atmo.image', limit: 0 }),
+				listRecords({ collection: 'pics.atmo.video', limit: 0 })
+			]);
+			const imageItems: MediaRecord[] = (imageRecords as any[]).map((r) => ({
+				...r,
+				type: 'image' as const
+			}));
+			const videoItems: MediaRecord[] = (videoRecords as any[]).map((r) => ({
+				...r,
+				type: 'video' as const
+			}));
+			const all = [...imageItems, ...videoItems];
+			all.sort((a, b) => {
+				const dateA = (a.value as any).createdAt || '';
+				const dateB = (b.value as any).createdAt || '';
+				return dateB.localeCompare(dateA);
 			});
-			images = records as ImageRecord[];
+			items = all;
 		} catch (error) {
-			console.error('Failed to load images:', error);
+			console.error('Failed to load items:', error);
 		} finally {
 			loadingImages = false;
 		}
@@ -46,15 +64,75 @@
 
 	$effect(() => {
 		if (user.isLoggedIn) {
-			loadImages();
+			loadItems();
 		} else {
-			images = [];
+			items = [];
 		}
 	});
 
+	async function uploadVideo(file: File) {
+		isUploading = true;
+		uploadingMessage = 'Processing video...';
+		feedbackMessage = '';
+
+		try {
+			const { blob: thumbnailBlob, aspectRatio } = await generateVideoThumbnail(file);
+
+			uploadingMessage = 'Uploading video...';
+
+			const [videoBlobInfo, thumbnailBlobInfo] = await Promise.all([
+				uploadBlob({ blob: file }),
+				uploadBlob({ blob: thumbnailBlob })
+			]);
+
+			const rkey = createTID();
+
+			const record = {
+				$type: 'pics.atmo.video',
+				video: videoBlobInfo,
+				thumbnail: thumbnailBlobInfo,
+				aspectRatio,
+				createdAt: new Date().toISOString()
+			};
+
+			await putRecord({
+				collection: 'pics.atmo.video',
+				rkey,
+				record
+			});
+
+			const newItem: MediaRecord = {
+				uri: `at://${user.did}/pics.atmo.video/${rkey}`,
+				value: record,
+				type: 'video'
+			};
+			items = [newItem, ...items];
+
+			const shareLink = getShareLinkFromUri(newItem.uri, user.profile?.handle);
+			try {
+				await navigator.clipboard.writeText(shareLink);
+				feedbackMessage = 'Link copied to clipboard!';
+			} catch {
+				feedbackMessage = 'Video uploaded!';
+			}
+		} catch (error) {
+			console.error('Upload failed:', error);
+			feedbackMessage = 'Upload failed. Please try again.';
+		} finally {
+			isUploading = false;
+			uploadingMessage = '';
+			if (fileInput) {
+				fileInput.value = '';
+			}
+		}
+	}
+
 	async function uploadImage(file: File) {
+		if (file.type.startsWith('video/')) {
+			return uploadVideo(file);
+		}
 		if (!file.type.startsWith('image/')) {
-			feedbackMessage = 'Please drop an image file';
+			feedbackMessage = 'Please drop an image or video file';
 			return;
 		}
 
@@ -80,14 +158,15 @@
 			});
 
 			// Add the new image to the list
-			const newImage: ImageRecord = {
+			const newImage: MediaRecord = {
 				uri: `at://${user.did}/pics.atmo.image/${rkey}`,
-				value: record
+				value: record,
+				type: 'image'
 			};
-			images = [newImage, ...images];
+			items = [newImage, ...items];
 
 			// Copy link to clipboard
-			const shareLink = getShareLinkFromUri(newImage.uri);
+			const shareLink = getShareLinkFromUri(newImage.uri, user.profile?.handle);
 			try {
 				await navigator.clipboard.writeText(shareLink);
 				feedbackMessage = 'Link copied to clipboard!';
@@ -137,7 +216,7 @@
 		isDragging = false;
 
 		if (!user.isLoggedIn) {
-			feedbackMessage = 'Please log in to upload images';
+			feedbackMessage = 'Please log in to upload';
 			return;
 		}
 
@@ -146,16 +225,16 @@
 	}
 
 	function handlePaste(event: ClipboardEvent) {
-		const items = event.clipboardData?.items;
-		if (!items) return;
+		const pasteItems = event.clipboardData?.items;
+		if (!pasteItems) return;
 
-		for (const item of items) {
-			if (item.type.startsWith('image/')) {
+		for (const item of pasteItems) {
+			if (item.type.startsWith('image/') || item.type.startsWith('video/')) {
 				const file = item.getAsFile();
 				if (!file) return;
 
 				if (!user.isLoggedIn) {
-					feedbackMessage = 'Please log in to upload images';
+					feedbackMessage = 'Please log in to upload';
 					return;
 				}
 
@@ -165,16 +244,28 @@
 		}
 	}
 
-	function getImageUrl(record: ImageRecord): string | undefined {
+	function getThumbnailUrl(record: MediaRecord): string | undefined {
 		if (!user.did) return;
+		if (record.type === 'video') {
+			return getImageFromRecord(record.value, user.did, 'thumbnail');
+		}
 		return getImageFromRecord(record.value, user.did);
+	}
+
+	function getItemLink(item: MediaRecord): string {
+		const rkey = parseUri(item.uri)?.rkey ?? '';
+		const handle = user.profile?.handle ?? user.did ?? '';
+		if (item.type === 'video') {
+			return resolve('/v/[repo]/[rkey]', { repo: handle, rkey });
+		}
+		return resolve('/i/[repo]/[rkey]', { repo: handle, rkey });
 	}
 
 	async function copyLink(event: Event, uri: string) {
 		event.stopPropagation();
 		event.preventDefault();
 		try {
-			await navigator.clipboard.writeText(getShareLinkFromUri(uri));
+			await navigator.clipboard.writeText(getShareLinkFromUri(uri, user.profile?.handle));
 			feedbackMessage = 'Link copied!';
 			setTimeout(() => {
 				if (feedbackMessage === 'Link copied!') feedbackMessage = '';
@@ -184,31 +275,32 @@
 		}
 	}
 
-	async function deleteImage(event: Event, uri: string) {
+	async function deleteItem(event: Event, item: MediaRecord) {
 		event.stopPropagation();
 		event.preventDefault();
 
-		if (!confirm('Delete this image?')) return;
+		const isVideo = item.type === 'video';
+		if (!confirm(`Delete this ${isVideo ? 'video' : 'image'}?`)) return;
 
-		const parsed = parseUri(uri);
+		const parsed = parseUri(item.uri);
 		if (!parsed?.rkey) {
-			feedbackMessage = 'Failed to delete image';
+			feedbackMessage = `Failed to delete ${isVideo ? 'video' : 'image'}`;
 			return;
 		}
 
 		try {
 			await deleteRecord({
-				collection: 'pics.atmo.image',
+				collection: isVideo ? 'pics.atmo.video' : 'pics.atmo.image',
 				rkey: parsed.rkey
 			});
-			images = images.filter((img) => img.uri !== uri);
-			feedbackMessage = 'Image deleted';
+			items = items.filter((i) => i.uri !== item.uri);
+			feedbackMessage = `${isVideo ? 'Video' : 'Image'} deleted`;
 			setTimeout(() => {
-				if (feedbackMessage === 'Image deleted') feedbackMessage = '';
+				if (feedbackMessage.includes('deleted')) feedbackMessage = '';
 			}, 2000);
 		} catch (error) {
-			console.error('Failed to delete image:', error);
-			feedbackMessage = 'Failed to delete image';
+			console.error('Failed to delete:', error);
+			feedbackMessage = `Failed to delete ${isVideo ? 'video' : 'image'}`;
 		}
 	}
 </script>
@@ -241,7 +333,7 @@
 						d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
 					/>
 				</svg>
-				<span class="text-2xl font-medium">Uploading...</span>
+				<span class="text-2xl font-medium">{uploadingMessage || 'Uploading...'}</span>
 			</div>
 		</div>
 	{/if}
@@ -264,14 +356,14 @@
 						d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
 					/>
 				</svg>
-				<span class="text-2xl font-medium">Drop image here to upload</span>
+				<span class="text-2xl font-medium">Drop file here to upload</span>
 			</div>
 		</div>
 	{/if}
 
 	<div class="mx-auto my-4 max-w-3xl px-4 md:my-32">
 		<h1 class="text-3xl font-bold">atmo.pics</h1>
-		<h1 class="my-2">atproto image sharing</h1>
+		<h1 class="my-2">atproto image and video sharing</h1>
 
 		<a
 			href="https://github.com/flo-bit/atproto-image-sharing"
@@ -300,14 +392,14 @@
 
 			<input
 				type="file"
-				accept="image/*"
+				accept="image/*,video/*"
 				class="hidden"
 				bind:this={fileInput}
 				onchange={handleFileInput}
 			/>
 
 			<Button class="mt-8" disabled={isUploading} onclick={() => fileInput?.click()}>
-				{isUploading ? 'Uploading...' : 'Upload image'}
+				{isUploading ? 'Uploading...' : 'Upload image or video'}
 			</Button>
 
 			<div
@@ -322,30 +414,43 @@
 
 			{#if loadingImages}
 				<div class="mt-8 text-sm">Loading images...</div>
-			{:else if images.length > 0}
+			{:else if items.length > 0}
 				<div class="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3">
-					{#each images as image (image.uri)}
-						{@const imageUrl = getImageUrl(image)}
-						{#if imageUrl}
+					{#each items as item (item.uri)}
+						{@const thumbnailUrl = getThumbnailUrl(item)}
+						{#if thumbnailUrl}
 							<a
-								href={getShareLink(
-									user.profile?.handle ?? user.did ?? '',
-									parseUri(image.uri)?.rkey ?? ''
-								)}
+								href={getItemLink(item)}
 								class="group bg-base-200 dark:bg-base-800 relative aspect-square overflow-hidden rounded-xl"
 							>
 								<img
-									src={imageUrl}
+									src={thumbnailUrl}
 									alt=""
 									class="h-full w-full object-cover transition-transform group-hover:scale-105"
 								/>
+								{#if item.type === 'video'}
+									<div
+										class="pointer-events-none absolute inset-0 flex items-center justify-center"
+									>
+										<div class="rounded-full bg-black/50 p-3">
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												class="h-8 w-8 text-white"
+												viewBox="0 0 24 24"
+												fill="currentColor"
+											>
+												<path d="M8 5v14l11-7z" />
+											</svg>
+										</div>
+									</div>
+								{/if}
 								<div
 									class="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 pointer-coarse:opacity-100"
 								>
 									<button
 										type="button"
 										class="rounded-full bg-black/50 p-2 text-white hover:bg-black/70"
-										onclick={(e) => copyLink(e, image.uri)}
+										onclick={(e) => copyLink(e, item.uri)}
 										title="Copy link"
 									>
 										<svg
@@ -366,8 +471,8 @@
 									<button
 										type="button"
 										class="rounded-full bg-black/50 p-2 text-white hover:bg-red-600"
-										onclick={(e) => deleteImage(e, image.uri)}
-										title="Delete image"
+										onclick={(e) => deleteItem(e, item)}
+										title="Delete"
 									>
 										<svg
 											xmlns="http://www.w3.org/2000/svg"
@@ -390,7 +495,7 @@
 					{/each}
 				</div>
 			{:else}
-				<div class="text-base-500 mt-8 text-sm">No images uploaded yet</div>
+				<div class="text-base-500 mt-8 text-sm">No images or videos uploaded yet</div>
 			{/if}
 		{/if}
 	</div>

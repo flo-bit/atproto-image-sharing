@@ -3,15 +3,28 @@
 import { resolve } from '$app/paths';
 import { parseUri } from './atproto';
 
-export function getShareLinkFromUri(uri: string): string {
+export function getShareLinkFromUri(uri: string, handle?: string): string {
 	const parts = parseUri(uri);
 	if (!parts || !parts.rkey) return '';
 
-	return getShareLink(parts.repo, parts.rkey);
+	const repo = handle || parts.repo;
+
+	if (parts.collection === 'pics.atmo.video') {
+		return getVideoShareLink(repo, parts.rkey);
+	}
+
+	return getShareLink(repo, parts.rkey);
 }
 
 export function getShareLink(repo: string, rkey: string): string {
 	return `${window.location.origin}${resolve('/i/[repo]/[rkey]', {
+		repo: repo,
+		rkey: rkey
+	})}`;
+}
+
+export function getVideoShareLink(repo: string, rkey: string): string {
+	return `${window.location.origin}${resolve('/v/[repo]/[rkey]', {
 		repo: repo,
 		rkey: rkey
 	})}`;
