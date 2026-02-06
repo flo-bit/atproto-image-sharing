@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npx tsc:*)",
       "mcp__plugin_svelte_svelte__svelte-autofixer",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(ls:*)"
     ]
   }
 }
