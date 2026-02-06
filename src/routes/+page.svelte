@@ -432,7 +432,7 @@
 
 	<div class="mx-auto my-4 max-w-3xl px-4 md:my-32">
 		<h1 class="text-3xl font-bold">atmo.pics</h1>
-		<h1 class="my-2">atproto image and video sharing</h1>
+		<h1 class="my-2">quick atproto image, video and markdown sharing</h1>
 
 		<a
 			href="https://github.com/flo-bit/atproto-image-sharing"
