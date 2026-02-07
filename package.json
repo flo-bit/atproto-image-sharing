@@ -51,6 +51,7 @@
 		"@sveltejs/adapter-cloudflare": "^7.2.6",
 		"@types/dompurify": "^3.2.0",
 		"dompurify": "^3.3.1",
+		"highlight.js": "^11.11.1",
 		"marked": "^17.0.1",
 		"wrangler": "^4.61.1"
 	}

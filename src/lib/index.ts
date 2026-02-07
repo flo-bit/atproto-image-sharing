@@ -17,6 +17,10 @@ export function getShareLinkFromUri(uri: string, handle?: string): string {
 		return getMarkdownShareLink(repo, parts.rkey);
 	}
 
+	if (parts.collection === 'pics.atmo.code') {
+		return getCodeShareLink(repo, parts.rkey);
+	}
+
 	return getShareLink(repo, parts.rkey);
 }
 
@@ -36,6 +40,13 @@ export function getVideoShareLink(repo: string, rkey: string): string {
 
 export function getMarkdownShareLink(repo: string, rkey: string): string {
 	return `${window.location.origin}${resolve('/m/[repo]/[rkey]', {
+		repo: repo,
+		rkey: rkey
+	})}`;
+}
+
+export function getCodeShareLink(repo: string, rkey: string): string {
+	return `${window.location.origin}${resolve('/c/[repo]/[rkey]', {
 		repo: repo,
 		rkey: rkey
 	})}`;

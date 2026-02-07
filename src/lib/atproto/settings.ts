@@ -13,7 +13,7 @@ export const permissions = {
 
 	// example: only allow create and delete
 	// collections: ['xyz.statusphere.status?action=create&action=update'],
-	collections: ['pics.atmo.image', 'pics.atmo.video', 'pics.atmo.markdown'],
+	collections: ['pics.atmo.image', 'pics.atmo.video', 'pics.atmo.markdown', 'pics.atmo.code'],
 
 	// what types of authenticated proxied requests you can make to services
 
