@@ -14,6 +14,7 @@ import { type AppBskyActorDefs } from '@atcute/bluesky';
 
 export type Collection = `${string}.${string}.${string}`;
 import * as TID from '@atcute/tid';
+import { isDid, isHandle } from '@atcute/lexicons/syntax';
 
 /**
  * Parses an AT Protocol URI into its components.
@@ -408,4 +409,8 @@ export async function searchActorsTypeahead(
  */
 export function createTID() {
 	return TID.now();
+}
+
+export async function repoToDid(repo: string) {
+	return isDid(repo) ? repo : isHandle(repo) ? await resolveHandle({ handle: repo }) : null;
 }
