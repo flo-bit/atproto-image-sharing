@@ -1,9 +1,11 @@
 import { repoToDid } from '$lib/atproto/methods';
-import { getVideo } from './video.server';
+import { getImage } from './image.server';
 import { error } from '@sveltejs/kit';
 
-export async function load({ params }) {
+export async function GET({ params }) {
 	const did = await repoToDid(params.repo);
 	if (!did) throw error(404, 'User not found');
-	return await getVideo(did, params.rkey);
+
+	const image = await getImage(did, params.rkey);
+	return await fetch(image.imageUrl);
 }
